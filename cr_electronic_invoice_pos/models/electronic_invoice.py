@@ -49,17 +49,17 @@ class AccountJournal(models.Model):
 
 class PosConfig(models.Model):
     _inherit = 'pos.config'
-    sucursal = fields.Integer(string="Branch", required=False, default="1")
+    sucursal = fields.Integer(string="Sucursal", required=False, default="1")
     terminal = fields.Integer(string="Terminal", required=False, default="1")
     FE_sequence_id = fields.Many2one("ir.sequence",
-                                     string="Electronic Invoice Sequence",
+                                     string="Secuencia de Facturas Electrónicas",
                                      required=False)
     NC_sequence_id = fields.Many2one("ir.sequence",
                                      oldname='return_sequence_id',
-                                     string="Electronic Credit Note Sequence",
+                                     string="Secuencia de Notas de Crédito Electrónicas",
                                      required=False)
     TE_sequence_id = fields.Many2one("ir.sequence",
-                                     string="Electronic Ticket Sequence",
+                                     string="Secuencia de Tiquetes Electrónicos",
                                      required=False)
 class PosOrder(models.Model):
     _name = "pos.order"
@@ -120,48 +120,48 @@ class PosOrder(models.Model):
         return order
 
     number_electronic = fields.Char(
-        string="Electronic Number", required=False, copy=False, index=True)
+        string="Número electrónico", required=False, copy=False, index=True)
     date_issuance = fields.Char(
-        string="Issue date", required=False, copy=False)
-    state_tributacion = fields.Selection([('aceptado', 'Accepted'),
-                                          ('rechazado', 'Rejected'),
-                                          ('rejected', 'Rejected2'),
-                                          ('no_encontrado', 'Not found'),
-                                          ('no_aplica', 'No apply'),
-                                          ('recibido', 'Received'),
-                                          ('firma_invalida', 'Invalid Sign'),
+        string="Fecha de emisión", required=False, copy=False)
+    state_tributacion = fields.Selection([('aceptado', 'Aceptado'),
+                                          ('rechazado', 'Rechazado'),
+                                          ('rejected', 'Rechazado2'),
+                                          ('no_encontrado', 'No encontrado'),
+                                          ('no_aplica', 'No aplica'),
+                                          ('recibido', 'Recibido'),
+                                          ('firma_invalida', 'Firma Inválida'),
                                           ('error', 'Error'),
-                                          ('procesando', 'Procesing')], 'FE State', copy=False)
+                                          ('procesando', 'Procesando')], 'Estado FE', copy=False)
 
     reference_code_id = fields.Many2one(
-        "reference.code", string="Reference code", required=False)
+        "reference.code", string="Código de referencia", required=False)
     pos_order_id = fields.Many2one(
-        "pos.order", string="Reference document", required=False, copy=False)
+        "pos.order", string="Documento de referencia", required=False, copy=False)
     xml_respuesta_tributacion = fields.Binary(
-        string="Taxation XML response", required=False, copy=False, attachment=True)
+        string="Respuesta Tributación XML", required=False, copy=False, attachment=True)
     fname_xml_respuesta_tributacion = fields.Char(
-        string="Taxation XML response filename", required=False, copy=False)
+        string="Nombre de archivo XML Respuesta Tributación", required=False, copy=False)
     xml_comprobante = fields.Binary(
-        string="XML receipt", required=False, copy=False, attachment=True)
+        string="Comprobante XML", required=False, copy=False, attachment=True)
     fname_xml_comprobante = fields.Char(
-        string="XML receipt filename", required=False, copy=False)
-    state_email = fields.Selection([('no_email', 'Without email'), (
-        'sent', 'Sent'), ('fe_error', 'Error FE')], 'Email state', copy=False)
+        string="Nombre de archivo Comprobante XML", required=False, copy=False)
+    state_email = fields.Selection([('no_email', 'Sin cuenta de correo'), (
+        'sent', 'Enviado'), ('fe_error', 'Error FE')], 'Estado email', copy=False)
     error_count = fields.Integer(
-        string="Amount of errors", required=False, default="0")
+        string="Cantidad de errores", required=False, default="0")
     tipo_documento = fields.Selection(
         oldname='doc_type',
-        selection=[('FE', 'Electronic Invoice'),
-                   ('TE', 'Electronic Ticket'),
-                   ('NC', 'Electronic Credit Note')],
-        string="Document Type",
+        selection=[('FE', 'Factura Electrónica'),
+                   ('TE', 'Tiquete Electrónico'),
+                   ('NC', 'Nota de Crédito')],
+        string="Tipo Comprobante",
         required=False, default='FE',
-        help='Show document type in concordance with '
-             'Ministerio de Hacienda classification')
+        help='Indica el tipo de documento de acuerdo a la '
+             'clasificación del Ministerio de Hacienda')
 
-    sequence = fields.Char(string='Consecutive', readonly=True, )
+    sequence = fields.Char(string='Consecutivo', readonly=True, )
 
-    economic_activity_id = fields.Many2one("economic.activity", string="Economic Activity", required=False, )
+    economic_activity_id = fields.Many2one("economic.activity", string="Actividad Económica", required=False, )
 
     _sql_constraints = [
         ('number_electronic_uniq', 'unique (number_electronic)',
@@ -247,7 +247,8 @@ class PosOrder(models.Model):
     @api.model
     def _consultahacienda_pos(self, max_orders=10):  # cron
         pos_orders = self.env['pos.order'].search([('state', 'in', ('paid', 'done', 'invoiced')),
-                                                   ('number_electronic', '!=', False),
+                                                   ('number_electronic',
+                                                    '!=', False),
                                                    ('state_tributacion', 'in', ('recibido', 'procesando'))],
                                                   limit=max_orders)
         total_orders = len(pos_orders)
@@ -256,9 +257,8 @@ class PosOrder(models.Model):
             'MAB - Consulta Hacienda - POS Orders to check: %s', total_orders)
         for doc in pos_orders:
             current_order += 1
-            _logger.error(
-                'MAB - Consulta Hacienda - POS Order %s / %s number: %s', current_order, total_orders, doc.name)
-
+            _logger.info(
+                'MAB - Consulta Hacienda - POS Order %s / %s', current_order, total_orders)
             token_m_h = api_facturae.get_token_hacienda(
                 doc, doc.company_id.frm_ws_ambiente)
             if doc.number_electronic and len(doc.number_electronic) == 50:
@@ -281,31 +281,26 @@ class PosOrder(models.Model):
                     doc.fname_xml_respuesta_tributacion = 'AHC_' + doc.number_electronic + '.xml'
                     doc.xml_respuesta_tributacion = response_json.get(
                         'respuesta-xml')
-                    if doc.partner_id and doc.partner_id.email:  # and not doc.partner_id.opt_out:
-                        try:
-                            email_template = self.env.ref(
-                                'cr_electronic_invoice_pos.email_template_pos_invoice', False)
-                            attachment = self.env['ir.attachment'].search(
-                                [('res_model', '=', 'pos.order'), ('res_id', '=', doc.id),
-                                ('res_field', '=', 'xml_comprobante')], limit=1)
-                            attachment.name = doc.fname_xml_comprobante
-                            attachment.datas_fname = doc.fname_xml_comprobante
-
-                            attachment_resp = self.env['ir.attachment'].search(
-                                [('res_model', '=', 'pos.order'), ('res_id', '=', doc.id),
-                                ('res_field', '=', 'xml_respuesta_tributacion')], limit=1)
-                            attachment_resp.name = doc.fname_xml_respuesta_tributacion
-                            attachment_resp.datas_fname = doc.fname_xml_respuesta_tributacion
-
-                            email_template.attachment_ids = [
-                                (6, 0, [attachment.id, attachment_resp.id])]
-                            email_template.with_context(type='binary', default_type='binary').send_mail(doc.id,
-                                                                                                        raise_exception=False,
-                                                                                                        force_send=True)  # default_type='binary'
-                            email_template.attachment_ids = [(5)]
-                            doc.state_email = 'sent'
-                        except:
-                            doc.state_email = 'fe_error'
+                    if doc.partner_id and doc.partner_id.email:
+                        email_template = self.env.ref(
+                            'cr_electronic_invoice_pos.email_template_pos_invoice', False)
+                        attachment = self.env['ir.attachment'].search(
+                            [('res_model', '=', 'pos.order'), ('res_id', '=', doc.id),
+                             ('res_field', '=', 'xml_comprobante')], limit=1)
+                        attachment.name = doc.fname_xml_comprobante
+                        attachment.datas_fname = doc.fname_xml_comprobante
+                        attachment_resp = self.env['ir.attachment'].search(
+                            [('res_model', '=', 'pos.order'), ('res_id', '=', doc.id),
+                             ('res_field', '=', 'xml_respuesta_tributacion')], limit=1)
+                        attachment_resp.name = doc.fname_xml_respuesta_tributacion
+                        attachment_resp.datas_fname = doc.fname_xml_respuesta_tributacion
+                        email_template.attachment_ids = [
+                            (6, 0, [attachment.id, attachment_resp.id])]
+                        email_template.with_context(type='binary', default_type='binary').send_mail(doc.id,
+                                                                                                    raise_exception=False,
+                                                                                                    force_send=True)  # default_type='binary'
+                        email_template.attachment_ids = [(5)]
+                        doc.state_email = 'sent'
                     else:
                         doc.state_email = 'no_email'
                         _logger.info('MAB - Email no enviado - Cliente no definido')
@@ -341,7 +336,7 @@ class PosOrder(models.Model):
                         doc.error_count += 1
                         doc.state_tributacion = ''
                     _logger.error(
-                        'MAB - Consulta Hacienda - POS Order %s in state "%s" - Error count: %s', doc.number_electronic, estado_m_h, doc.error_count)
+                        'MAB - Consulta Hacienda - POS Order no encontrada: %s', doc.number_electronic)
             else:
                 doc.state_tributacion = 'error'
                 _logger.error(
@@ -478,7 +473,6 @@ class PosOrder(models.Model):
                 base_subtotal = 0.0
                 total_otros_cargos = 0.0
                 total_iva_devuelto = 0.0
-                _no_CABYS_code = False
                 for line in doc.lines:
                     line_number += 1
                     price = line.price_unit * (1 - line.discount / 100.0)
@@ -492,7 +486,7 @@ class PosOrder(models.Model):
                         price, line.order_id.pricelist_id.currency_id, 1, product=line.product_id, partner=line.order_id.partner_id)
                     if line.discount != 100:
                         price_unit = round(
-                            line_taxes['total_excluded'] / (1 - line.discount / 100.0), 5)
+                        	line_taxes['total_excluded'] / (1 - line.discount / 100.0), 5)
                     else:
                         price_unit = 0
                     base_line = abs(round(price_unit * qty, 5))
@@ -506,15 +500,6 @@ class PosOrder(models.Model):
                         "montoTotal": base_line,
                         "subtotal": subtotal_line,
                     }
-
-                    if line.product_id.cabys_code:
-                        dline["codigoCabys"] = line.product_id.cabys_code
-                    elif line.product_id.categ_id and line.product_id.categ_id.cabys_code:
-                        dline["codigoCabys"] = line.product_id.categ_id.cabys_code
-                    else:
-                        _no_CABYS_code = 'Aviso!.\nLinea sin código CABYS: %s' % line.product_id.name
-                        continue
-
                     if line.discount:
                         descuento = abs(round(base_line - subtotal_line, 5))
                         total_descuento += descuento
@@ -548,8 +533,6 @@ class PosOrder(models.Model):
                                 }
                     dline["impuesto"] = taxes
                     dline["impuestoNeto"] = _line_tax
-
-                    # Si no hay product_id se asume como mercaderia
                     if line.product_id and line.product_id.type == 'service':
                         if taxes:
                             total_servicio_gravado += base_line
@@ -565,12 +548,6 @@ class PosOrder(models.Model):
                     base_subtotal += subtotal_line
                     dline["montoTotalLinea"] = round(subtotal_line + _line_tax, 5)
                     lines[line_number] = dline
-
-                if _no_CABYS_code and doc.tipo_documento != 'NC':  # CAByS is not required for financial NCs
-                    doc.message_post(
-                        subject='Error',
-                        body=_no_CABYS_code)
-                    continue
                 if total_otros_cargos:
                     total_otros_cargos = round( total_otros_cargos, 5)
                     otros_cargos_id = 1
